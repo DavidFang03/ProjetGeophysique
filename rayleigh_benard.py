@@ -73,9 +73,7 @@ problem = d3.IVP([p, b, u, tau_p, tau_b1, tau_b2, tau_u1, tau_u2], namespace=loc
 problem.add_equation("trace(grad_u) + tau_p = 0")  # Conservation masse
 problem.add_equation("dt(b) - kappa*div(grad_b) + lift(tau_b2) = - u@grad(b)") # Equation température
 problem.add_equation("dt(u) - nu*div(grad_u) + grad(p) - b*ez + lift(tau_u2) = - u@grad(u)") # NS
-# Salinité entre rho, s,
-# Transition de phase entre T,s
-# CL
+
 problem.add_equation("b(z=0) = Lz")
 problem.add_equation("u(z=0) = 0")
 problem.add_equation("b(z=Lz) = 0")
@@ -93,7 +91,7 @@ b['g'] *= z * (Lz - z) # Damp noise at walls
 b['g'] += Lz - z # Add linear background
 
 # Analysis
-snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.25, max_writes=50)
+snapshots = solver.evaluator.add_file_handler('snapshots/rb', sim_dt=0.25, max_writes=50)
 snapshots.add_task(b, name='buoyancy')
 snapshots.add_task(-d3.div(d3.skew(u)), name='vorticity')
 

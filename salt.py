@@ -33,15 +33,17 @@ logger = logging.getLogger(__name__)
 # Parameters
 Lx, Lz = 4, 1
 Nx, Nz = 256, 64
-Rayleigh = 2e6 # sous entendu rayleigh de "température"
-Flot = 0
-X = 0 # Nb sans dim dans la condition aux limites
-D = 1e-4 # coeff diffusion
+Rayleigh = 1e4 # sous entendu rayleigh de "température"
+Flot = 1
+X = 1e-2 # Nb sans dim dans la condition aux limites
+Le = 2 # kappa/D
 Prandtl = 1
 dealias = 3/2
 stop_sim_time = 50
 timestepper = d3.RK222
+# max_timestep = 0.125
 max_timestep = 0.125
+initial_timestep = 1e-9
 dtype = np.float64
 
 # Bases
@@ -79,9 +81,9 @@ grad_c = d3.grad(c) + ez*lift(tau_c1) # First-order reduction
 # First-order form: "lap(f)" becomes "div(grad_f)"
 problem = d3.IVP([p, th, c, u, tau_p, tau_th1, tau_th2, tau_c1, tau_c2, tau_u1, tau_u2], namespace=locals())
 problem.add_equation("trace(grad_u) + tau_p = 0")  # Conservation masse
-problem.add_equation("dt(th) - kappa*div(grad_th) + lift(tau_th2) = - u@grad(th)") # Equation advection-diffusion de température
-problem.add_equation("dt(c) - D*div(grad_c) + lift(tau_c2) = - u@grad(c)") # Equation advection-diffusion de salinité
-problem.add_equation("dt(u) - Prandtl*div(grad_u) + grad(p) + Prandtl*Rayleigh*(th - Flot*c)*ez + lift(tau_u2) = - u@grad(u)") # Navier-Stokes
+problem.add_equation("dt(th) - div(grad_th) + lift(tau_th2) = - u@grad(th)") # Equation advection-diffusion de température
+problem.add_equation("dt(c) - (1/Le)*div(grad_c) + lift(tau_c2) = - u@grad(c)") # Equation advection-diffusion de salinité
+problem.add_equation("dt(u) - Prandtl*div(grad_u) + grad(p) - Prandtl*Rayleigh*(th - Flot*c)*ez + lift(tau_u2) = - u@grad(u)") # Navier-Stokes
 
 dzth = d3.Differentiate(th, coords['z'])
 dzc = d3.Differentiate(c, coords['z'])
@@ -94,14 +96,16 @@ dzc = d3.Differentiate(c, coords['z'])
 # # ? IMposer les conditions aux limites des gradients ?
 # problem.add_equation("th(z=Lz) = 0")  # ? Dépend du diagramme de phase
 # problem.add_equation("u(z=Lz) = 0")
-problem.add_equation("dzth(z=Lz) = X*dzc(z=Lz)/c(z=Lz)") # ? Stefan-Robin
 # problem.add_equation("c(z=Lz) = -18.7*th(z=Lz) - 0.519*th(z=Lz)**2 - 0.00535*th(z=Lz)**3")
-problem.add_equation("c(z=Lz) = 1")
+# problem.add_equation("dzth(z=Lz) = X*dzc(z=Lz)/c(z=Lz)") # ? Stefan-Robin
+problem.add_equation("-dzc(z=Lz) + (1/X)*dzth(z=Lz) = dzc(z=Lz)*(1/c(z=Lz)-1)") # ? Stefan-Robin
+problem.add_equation("th(z=Lz) = 0")
+# problem.add_equation("c(z=Lz) = 1")
 problem.add_equation("u(z=Lz) = 0")
 # problem.add_equation("c(z=0) = 0") # Pas besoin ?
 # ? IMposer les conditions aux limites des gradients ?
 problem.add_equation("th(z=0) = 1")  # Température au fond
-problem.add_equation("c(z=0) = 1") # Concentration au fond
+problem.add_equation("dzc(z=0) = 0") # Concentration au fond
 problem.add_equation("u(z=0) = 0") 
 
 
@@ -118,21 +122,23 @@ solver.stop_sim_time = stop_sim_time
 th.fill_random('g', seed=42, distribution='normal', scale=1e-3) # Random noise
 th['g'] *= z * (Lz - z) # Damp noise at walls
 th['g'] += Lz - z # Add linear background
+th['g']+=1
 
 # c['g'] = 0.1 # Add linear background
 c.fill_random('g', seed=42, distribution='normal', scale=1e-3) # Random noise
-c+=1
 # c['g'] *= z * (Lz - z) # Damp noise at walls
+c['g']*= z * (Lz - z)
+c['g']+= (Lz - z)/X
 # c['g'] += Lz - z # Add linear background
 
 # Analysis
-snapshots = solver.evaluator.add_file_handler('snapshots/0711', sim_dt=0.25, max_writes=50)
+snapshots = solver.evaluator.add_file_handler('snapshots/1411', sim_dt=0.25, max_writes=50)
 snapshots.add_task(th, name='temperature')
 snapshots.add_task(c, name='salinity')
 snapshots.add_task(-d3.div(d3.skew(u)), name='vorticity')
 
 # CFL
-CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=10, safety=0.5, threshold=0.05,
+CFL = d3.CFL(solver, initial_dt=initial_timestep, cadence=10, safety=0.5, threshold=0.05,
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
 CFL.add_velocity(u)
 

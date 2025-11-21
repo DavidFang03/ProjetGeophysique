@@ -34,17 +34,19 @@ logger = logging.getLogger(__name__)
 Lx, Lz = 4, 1
 Nx, Nz = 256, 64
 Rayleigh = 1e4 # sous entendu rayleigh de "température"
-Flot = 1
-X = 1e-2 # Nb sans dim dans la condition aux limites
+Flot = 0.1
+X = 100 # Nb sans dim dans la condition aux limites
 Le = 2 # kappa/D
 Prandtl = 1
 dealias = 3/2
 stop_sim_time = 50
 timestepper = d3.RK222
-# max_timestep = 0.125
 max_timestep = 0.125
 initial_timestep = 1e-9
+sim_dt = 1e-3
 dtype = np.float64
+nu = (Rayleigh / Prandtl)**(-1/2)
+kappa = (Rayleigh * Prandtl)**(-1/2)
 
 # Bases
 coords = d3.CartesianCoordinates('x', 'z')
@@ -65,9 +67,7 @@ tau_c2 = dist.Field(name='tau_c2', bases=xbasis)
 tau_u1 = dist.VectorField(coords, name='tau_u1', bases=xbasis)
 tau_u2 = dist.VectorField(coords, name='tau_u2', bases=xbasis)
 
-# Substitutions
-kappa = (Rayleigh * Prandtl)**(-1/2)
-nu = (Rayleigh / Prandtl)**(-1/2)
+### Substitutions
 x, z = dist.local_grids(xbasis, zbasis)
 ex, ez = coords.unit_vector_fields(dist)
 lift_basis = zbasis.derivative_basis(1)
@@ -76,9 +76,7 @@ grad_u = d3.grad(u) + ez*lift(tau_u1) # First-order reduction
 grad_th = d3.grad(th) + ez*lift(tau_th1) # First-order reduction
 grad_c = d3.grad(c) + ez*lift(tau_c1) # First-order reduction
 
-# Problem
-# First-order form: "div(f)" becomes "trace(grad_f)"
-# First-order form: "lap(f)" becomes "div(grad_f)"
+### Equations
 problem = d3.IVP([p, th, c, u, tau_p, tau_th1, tau_th2, tau_c1, tau_c2, tau_u1, tau_u2], namespace=locals())
 problem.add_equation("trace(grad_u) + tau_p = 0")  # Conservation masse
 problem.add_equation("dt(th) - div(grad_th) + lift(tau_th2) = - u@grad(th)") # Equation advection-diffusion de température
@@ -87,29 +85,17 @@ problem.add_equation("dt(u) - Prandtl*div(grad_u) + grad(p) - Prandtl*Rayleigh*(
 
 dzth = d3.Differentiate(th, coords['z'])
 dzc = d3.Differentiate(c, coords['z'])
-# Salinité entre rho, s,
-# Transition de phase entre T,s
-# CL
-# problem.add_equation("th(z=0) = Lz") # ? Homogène à une longueur ? Dépend du diagramme de phase
-# problem.add_equation("u(z=0) = 0") 
-# problem.add_equation("c(z=0) = 0") # ? dépend de \dot s
-# # ? IMposer les conditions aux limites des gradients ?
-# problem.add_equation("th(z=Lz) = 0")  # ? Dépend du diagramme de phase
-# problem.add_equation("u(z=Lz) = 0")
-# problem.add_equation("c(z=Lz) = -18.7*th(z=Lz) - 0.519*th(z=Lz)**2 - 0.00535*th(z=Lz)**3")
-# problem.add_equation("dzth(z=Lz) = X*dzc(z=Lz)/c(z=Lz)") # ? Stefan-Robin
-problem.add_equation("-dzc(z=Lz) + (1/X)*dzth(z=Lz) = dzc(z=Lz)*(1/c(z=Lz)-1)") # ? Stefan-Robin
-problem.add_equation("th(z=Lz) = 0")
-# problem.add_equation("c(z=Lz) = 1")
+
+## Conditions aux limites
+# problem.add_equation("(1/X)*dzth(z=Lz) = dzc(z=Lz)/c(z=Lz)") # ? Stefan-Robin
+# problem.add_equation("-dzc(z=Lz) + (1/X)*dzth(z=Lz) = dzc(z=Lz)*(1/c(z=Lz)-1)")
+problem.add_equation("dzc(z=Lz)  = (1/X)*dzth(z=Lz)*c(z=Lz)")
+problem.add_equation("th(z=Lz) = -1")
 problem.add_equation("u(z=Lz) = 0")
-# problem.add_equation("c(z=0) = 0") # Pas besoin ?
-# ? IMposer les conditions aux limites des gradients ?
-problem.add_equation("th(z=0) = 1")  # Température au fond
+
+problem.add_equation("th(z=0) = 0")  # Température au fond
 problem.add_equation("dzc(z=0) = 0") # Concentration au fond
 problem.add_equation("u(z=0) = 0") 
-
-
-# problem.add_equation("c(z=0) = 1") # pas besoin ?
 
 problem.add_equation("integ(p) = 0") # ? Pressure gauge
 
@@ -118,21 +104,20 @@ problem.add_equation("integ(p) = 0") # ? Pressure gauge
 solver = problem.build_solver(timestepper)
 solver.stop_sim_time = stop_sim_time
 
-# Initial conditions : On rajoute un bruit gaussien ?
+## Coniditions initiales
 th.fill_random('g', seed=42, distribution='normal', scale=1e-3) # Random noise
 th['g'] *= z * (Lz - z) # Damp noise at walls
 th['g'] += Lz - z # Add linear background
-th['g']+=1
+# th['g']+=1
 
-# c['g'] = 0.1 # Add linear background
 c.fill_random('g', seed=42, distribution='normal', scale=1e-3) # Random noise
-# c['g'] *= z * (Lz - z) # Damp noise at walls
 c['g']*= z * (Lz - z)
 c['g']+= (Lz - z)/X
-# c['g'] += Lz - z # Add linear background
+c['g']+= 1
+
 
 # Analysis
-snapshots = solver.evaluator.add_file_handler('snapshots/1411', sim_dt=0.25, max_writes=50)
+snapshots = solver.evaluator.add_file_handler('snapshots/2111', sim_dt=sim_dt, max_writes=50)
 snapshots.add_task(th, name='temperature')
 snapshots.add_task(c, name='salinity')
 snapshots.add_task(-d3.div(d3.skew(u)), name='vorticity')
@@ -146,6 +131,9 @@ CFL.add_velocity(u)
 flow = d3.GlobalFlowProperty(solver, cadence=10)
 flow.add_property(np.sqrt(u@u)/nu, name='Re')
 
+flow.add_property(dzth(z=Lz), name='Fth')
+flow.add_property(dzc(z=Lz), name='Fch')
+
 # Main loop
 try:
     logger.info('Starting main loop')
@@ -154,7 +142,9 @@ try:
         solver.step(timestep)
         if (solver.iteration-1) % 10 == 0:
             max_Re = flow.max('Re')
-            logger.info('Iteration=%i, Time=%e, dt=%e, max(Re)=%f' %(solver.iteration, solver.sim_time, timestep, max_Re))
+            max_Fth = flow.max('Fth')
+            max_Fch = flow.max('Fch')
+            logger.info('Iteration=%i, Time=%e, dt=%e, max(Re)=%f, max(Fth)=%f, max(Fch)=%f' %(solver.iteration, solver.sim_time, timestep, max_Re, max_Fth, max_Fch))
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise

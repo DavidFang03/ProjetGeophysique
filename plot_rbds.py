@@ -8,7 +8,7 @@ Options:
     --output=<dir>  Output directory [default: ./frames]
 
 """
-#     or mpiexec -n 4 python3 plot_rbds.py snapshots/0711/*.h5 --output="./frames/0711"
+
 
 import h5py
 import numpy as np
@@ -47,7 +47,10 @@ def main(filename, start, count, output):
                 axes = mfig.add_axes(i, j, [0, 0, 1, 1])
                 # Call 3D plotting helper, slicing in time
                 dset = file['tasks'][task]
-                plot_tools.plot_bot_3d(dset, 0, index, axes=axes, title=task, even_scale=True, visible_axes=False)
+                if task=='salinity':
+                    plot_tools.plot_bot_3d(dset, 0, index, axes=axes, title=task, even_scale=True, visible_axes=False, clim=(1-1e-2,1+1e-2))
+                else:
+                    plot_tools.plot_bot_3d(dset, 0, index, axes=axes, title=task, even_scale=True, visible_axes=False)
             # Add time title
             title = title_func(file['scales/sim_time'][index])
             title_height = 1 - 0.5 * mfig.margin.top / mfig.fig.y
@@ -77,3 +80,6 @@ if __name__ == "__main__":
             if not output_path.exists():
                 output_path.mkdir()
     post.visit_writes(args['<files>'], main, output=output_path)
+
+
+#     or mpiexec -n 4 python3 plot_rbds.py snapshots/2111/*.h5 --output="./frames/2111"

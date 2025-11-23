@@ -1,5 +1,7 @@
 # Projet Géophysique M2 - Convection thermosolutale
-Lien du overleaf : https://www.overleaf.com/project/68f254d0e1582e502b564021
+- Lien du overleaf : https://www.overleaf.com/project/68f254d0e1582e502b564021
+- Doc Dedalus : https://dedalus-project.readthedocs.io/en/latest/index.html
+- Github Dedalus : https://github.com/DedalusProject/dedalus
 
 ## Usage
 - Activer environnement conda

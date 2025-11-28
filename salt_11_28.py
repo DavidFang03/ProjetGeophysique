@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 Lx, Lz = 4, 1
 Nx, Nz = 256, 64
 Rayleigh = 1e4 # sous entendu rayleigh de "température"
-Flot = 0.1
+Flot = 0.5
 X = 100 # Nb sans dim dans la condition aux limites de Stefan-Robin
 Y = 100 # Deuxieme Nb sans dim dans la condition aux limites de Stefan-Robin
 Le = 10 # kappa/D
@@ -59,7 +59,7 @@ zbasis = d3.ChebyshevT(coords['z'], size=Nz, bounds=(0, Lz), dealias=dealias)
 p = dist.Field(name='p', bases=(xbasis,zbasis))
 th = dist.Field(name='th', bases=(xbasis,zbasis))
 c = dist.Field(name='c', bases=(xbasis,zbasis))
-d_g = dist.Field(name='d_g', bases=(xbasis,zbasis))
+d_g = dist.Field(name='d_g', bases=(xbasis))
 u = dist.VectorField(coords, name='u', bases=(xbasis,zbasis))
 tau_p = dist.Field(name='tau_p')
 tau_th1 = dist.Field(name='tau_th1', bases=xbasis)
@@ -79,7 +79,7 @@ grad_th = d3.grad(th) + ez*lift(tau_th1) # First-order reduction
 grad_c = d3.grad(c) + ez*lift(tau_c1) # First-order reduction
 
 ### Equations
-problem = d3.IVP([p, th, c, u, tau_p, tau_th1, tau_th2, tau_c1, tau_c2, tau_u1, tau_u2], namespace=locals())
+problem = d3.IVP([p, th, c, u, tau_p, tau_th1, tau_th2, tau_c1, tau_c2, tau_u1, tau_u2,d_g], namespace=locals())
 problem.add_equation("trace(grad_u) + tau_p = 0")  # Conservation masse
 problem.add_equation("dt(th) - div(grad_th) + lift(tau_th2) = - u@grad(th)") # Equation advection-diffusion de température
 problem.add_equation("dt(c) - (1/Le)*div(grad_c) + lift(tau_c2) = - u@grad(c)") # Equation advection-diffusion de salinité
@@ -87,6 +87,8 @@ problem.add_equation("dt(u) - Prandtl*div(grad_u) + grad(p) - Prandtl*Rayleigh*(
 
 dzth = d3.Differentiate(th, coords['z'])
 dzc = d3.Differentiate(c, coords['z'])
+
+problem.add_equation("dt(d_g)=dzc(z=Lz)") # Bilan de sel sur l'épaisseur de glace
 
 ## Conditions aux limites
 # problem.add_equation("(1/X)*dzth(z=Lz) = dzc(z=Lz)/c(z=Lz)") # ? Stefan-Robin
@@ -99,7 +101,6 @@ problem.add_equation("th(z=0) = 0")  # Température au fond
 problem.add_equation("dzc(z=0) = 0") # Concentration au fond
 problem.add_equation("u(z=0) = 0")
 
-problem.add_equation("dt(d_g)=dzc") # Bilan de sel sur l'épaisseur de glace
 
 problem.add_equation("integ(p) = 0") # ? Pressure gauge
 
@@ -119,11 +120,11 @@ c['g']*= z * (Lz - z)
 c['g']+= (Lz - z)/X
 c['g']+= 1
 
-d_g['g'] = L_z/100
+d_g['g'] = Lz/100
 
 
 # Analysis
-snapshots = solver.evaluator.add_file_handler('snapshots/11_28_03', sim_dt=sim_dt, max_writes=50)
+snapshots = solver.evaluator.add_file_handler('snapshots/11_28_04', sim_dt=sim_dt, max_writes=50)
 snapshots.add_task(th, name='th')
 snapshots.add_task(c, name='c')
 snapshots.add_task(-d3.div(d3.skew(u)), name='vorticity')
@@ -139,8 +140,8 @@ CFL.add_velocity(u)
 flow = d3.GlobalFlowProperty(solver, cadence=10)
 flow.add_property(np.sqrt(u@u)/nu, name='Re')
 
-flow.add_property(dzth(z=Lz), name='Fth')
-flow.add_property(dzc(z=Lz), name='Fch')
+flow.add_property(-dzth(z=Lz), name='Fth')
+flow.add_property(-dzc(z=Lz), name='Fch')
 
 
 # Main loop

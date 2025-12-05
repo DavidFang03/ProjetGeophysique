@@ -35,7 +35,8 @@ logger = logging.getLogger(__name__)
 # ! Parameters
 
 folder_path = "snapshots/2111"
-restart = True
+folder_path_scalars = "scalars/2111"
+restart = False
 
 startfromprev = False
 filerestart = ""
@@ -97,6 +98,7 @@ grad_th = d3.grad(th) + ez*lift(tau_th1)
 grad_c = d3.grad(c) + ez*lift(tau_c1)
 dzth = d3.Differentiate(th, coords['z'])
 dzc = d3.Differentiate(c, coords['z'])
+
 
 # Equations
 problem = d3.IVP([p, th, c, u, tau_p, tau_th1, tau_th2, tau_c1,
@@ -174,6 +176,13 @@ snapshots.add_task(tau_u1, name='tau_u1')
 snapshots.add_task(tau_u2, name='tau_u2')
 snapshots.add_task(-d3.div(d3.skew(u)), name='vorticity')
 
+scalars = solver.evaluator.add_file_handler(
+    folder_path_scalars, sim_dt=sim_dt, max_writes=50, mode=file_handler_mode)
+
+# mean_th =
+scalars.add_task(d3.Average(th), name='mean_th')
+# mean_th.evaluate()?
+
 # CFL (cadence = recalcul de dt)
 CFL = d3.CFL(solver, initial_dt=initial_timestep, cadence=10, safety=0.5, threshold=0.05,
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
@@ -182,8 +191,8 @@ CFL.add_velocity(u)
 # ! Flow properties
 flow = d3.GlobalFlowProperty(solver, cadence=10)
 flow.add_property(np.sqrt(u@u)/nu, name='Re')
-flow.add_property(dzth(z=Lz), name='Fth')
-flow.add_property(dzc(z=Lz), name='Fch')
+flow.add_property(-dzth(z=Lz), name='Fth')
+flow.add_property(-dzc(z=Lz), name='Fch')
 
 # Main loop
 try:

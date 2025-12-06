@@ -16,15 +16,15 @@ conda install ffmpeg-python
 conda update ffmpeg
 ```
 ### 1. Simulation :
-`salt.py` pour run
+`salt.py` pour run. Il faut préciser une `run_name` (typiquement la date)
 ```bash
 mpiexec -n 8 python3 salt.py
 ```
 Paramètres : $\text{Ra}, \text{Flot}, \text{X}, \text{Le}, \text{Pr}$
 
 ### 2. Analyse :
-`plot_rbds` pour afficher la run : les images seront dans `--output` et la video dans `./videos`
+`plot_rbds` pour afficher la run : les images seront dans `./frames` et la video dans `./videos`. Dans le fichier il suffit de préciser le nom de la run `run_name` (ligne 25).
 ```bash
-mpiexec -n 4 python3 plot_rbds.py snapshots/2111/*.h5 --output="./frames/2111"
+mpiexec -n 4 python3 plot_rbds.py
 ```
-Paramètres : `tasks` pour sélectionner les grandeurs à afficher, `clims` pour les échelles des colorbars.
+Ligne 28 : `all_tasks` contient tous les paramètres des plots : titre et échelle.

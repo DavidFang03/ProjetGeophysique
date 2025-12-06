@@ -69,8 +69,9 @@ if __name__ == "__main__":
     p = Path(".")
 
     ##################################
-    files = list(p.glob("scalars/2111/*.h5"))
-    scalars_to_plot = ["mean_th"]
+    folder = "0512"
+    scalars_to_plot = ["mean_th", "mean_c", "flow_th", "flow_c", "rms_u"]
     ##################################
 
+    files = list(p.glob(f"scalars/{folder}/*.h5"))
     plot_and_stats(files, scalars_to_plot)

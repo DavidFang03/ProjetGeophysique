@@ -14,8 +14,9 @@ import numpy as np
 
 
 # TODO show parameters
-def plot_and_stats(files, scalars_to_plot):
+def plot_and_stats(run_name, scalars_to_plot):
     """Plots time series from files and returns stats"""
+    files = list(p.glob(f"scalars/{run_name}/*.h5"))
     # with Path("par.toml").open("rb") as file_in:
     #     par = tomli.load(file_in)
     # # Parameters
@@ -32,13 +33,13 @@ def plot_and_stats(files, scalars_to_plot):
     #     RR = out['RR']
 
     # rho = np.array([])
+
     all_arrays = {}
     for scalar in scalars_to_plot:
         all_arrays[scalar] = np.array([])
     t = np.array([])
     for filename in Tcl().call("lsort", "-dict", files):
         with h5py.File(filename, mode="r") as file:
-            print("Available scalars:", file["tasks"].keys())
 
             t = np.append(t, file["scales"]["sim_time"])
             for scalar in scalars_to_plot:
@@ -57,6 +58,7 @@ def plot_and_stats(files, scalars_to_plot):
         tax[i].legend(loc="upper right")
 
     plt.tight_layout()
+    plt.savefig(f"./videos/{run_name}.png")
     plt.show()
 
 
@@ -67,9 +69,12 @@ if __name__ == "__main__":
     p = Path(".")
 
     ##################################
-    folder = "0512"
+    run_name = "0612_Ra1e+04_Flot1e-01_X100_Y100_Le10_Pr1"
     scalars_to_plot = ["mean_th", "mean_c", "meanx_flux_th", "meanx_flux_c", "rms_u"]
     ##################################
 
-    files = list(p.glob(f"scalars/{folder}/*.h5"))
-    plot_and_stats(files, scalars_to_plot)
+    files = list(p.glob(f"scalars/{run_name}/*.h5"))
+    with h5py.File(files[0], mode="r") as file:
+        print("Available scalars:", file["tasks"].keys())
+
+    plot_and_stats(run_name, scalars_to_plot)

@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     ##################################
     folder = "0512"
-    scalars_to_plot = ["mean_th", "mean_c", "flow_th", "flow_c", "rms_u"]
+    scalars_to_plot = ["mean_th", "mean_c", "meanx_flux_th", "meanx_flux_c", "rms_u"]
     ##################################
 
     files = list(p.glob(f"scalars/{folder}/*.h5"))

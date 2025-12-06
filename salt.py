@@ -34,18 +34,12 @@ logger = logging.getLogger(__name__)
 
 
 # ! Parameters
-
-run_name = "0512"
-folder_path = f"snapshots/{run_name}"
-folder_path_scalars = f"scalars/{run_name}"
+##!########################################################
+run_name = "0612"
 restart = False
 
 startfromprev = False
 filerestart = ""
-
-folder_name = folder_path.split("/")[-1]
-restart_pattern = f"{folder_path}/{folder_name}_s*.h5"
-logger.info(f"Writing in {restart_pattern}")
 
 ## Parameters
 # Résolution
@@ -66,7 +60,14 @@ Prandtl = 1  # = nu/kappa_l
 stop_sim_time = 3
 export_snapshots_dt = 5e-3  # Export des *.h5 : pas de temps
 export_scalars_dt = 1e-3  # Export des scalaires : pas de temps
+##!########################################################
 
+run_name = f"{run_name}_Ra{Rayleigh:.0e}_Flot{Flot:.0e}_X{X}_Y{Y}_Le{Le}_Pr{Prandtl}"  # formater le reste si jamais
+folder_path = f"snapshots/{run_name}"
+folder_path_scalars = f"scalars/{run_name}"
+folder_name = folder_path.split("/")[-1]
+restart_pattern = f"{folder_path}/{folder_name}_s*.h5"
+logger.info(f"Writing in {restart_pattern}")
 
 # Ne pas toucher ?
 dealias = 3 / 2
@@ -211,6 +212,10 @@ snapshots.add_task(d3.Average(th, coord="x"), name="meanx_th")
 snapshots.add_task(d3.Average(c, coord="x"), name="meanx_c")
 snapshots.add_task(-dzth(z=Lz), name="flux_th")
 snapshots.add_task(-dzc(z=Lz), name="flux_c")
+snapshots.add_task(h, name="h")  # dépend que de x
+vz = d3.DotProduct(u, ez)
+snapshots.add_task(vz * th, name="vz_times_theta")
+snapshots.add_task(vz * c, name="vz_times_c")
 
 scalars = solver.evaluator.add_file_handler(
     folder_path_scalars, sim_dt=export_scalars_dt, max_writes=50, mode=file_handler_mode
@@ -272,3 +277,4 @@ except:
     raise
 finally:
     solver.log_stats()
+    logger.info(f"run name is {run_name}")

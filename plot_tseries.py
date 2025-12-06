@@ -38,17 +38,15 @@ def plot_and_stats(files, scalars_to_plot):
     t = np.array([])
     for filename in Tcl().call("lsort", "-dict", files):
         with h5py.File(filename, mode="r") as file:
-            print("Available scalars:", file["tasks"].keys(), end="")
+            print("Available scalars:", file["tasks"].keys())
 
             t = np.append(t, file["scales"]["sim_time"])
             for scalar in scalars_to_plot:
-                print(file["tasks"][scalar].shape)
                 all_arrays[scalar] = np.append(
                     all_arrays[scalar], file["tasks"][scalar][:, 0, 0]
                 )
 
     # plots
-    print(t.shape, all_arrays["mean_th"].shape)
     rowsnb = len(scalars_to_plot)
     if rowsnb == 1:
         rowsnb = 2

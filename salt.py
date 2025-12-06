@@ -57,14 +57,14 @@ Le = 10  # = kappa_l/D. Normalement ~1000. Pour équations de diffusions.
 Prandtl = 1  # = nu/kappa_l
 
 # Run
-stop_sim_time = 3
-export_snapshots_dt = 5e-3  # Export des *.h5 : pas de temps
-export_scalars_dt = 1e-3  # Export des scalaires : pas de temps
+stop_sim_time = 2
+export_snapshots_dt = 1e-2  # Export des *.h5 : pas de temps
+# export_scalars_dt = 1e-3  # Export des scalaires : pas de temps
 ##!########################################################
 
 run_name = f"{run_name}_Ra{Rayleigh:.0e}_Flot{Flot:.0e}_X{X}_Y{Y}_Le{Le}_Pr{Prandtl}"  # formater le reste si jamais
 folder_path = f"snapshots/{run_name}"
-folder_path_scalars = f"scalars/{run_name}"
+# folder_path_scalars = f"scalars/{run_name}"
 folder_name = folder_path.split("/")[-1]
 restart_pattern = f"{folder_path}/{folder_name}_s*.h5"
 logger.info(f"Writing in {restart_pattern}")
@@ -217,18 +217,19 @@ vz = d3.DotProduct(u, ez)
 snapshots.add_task(vz * th, name="vz_times_theta")
 snapshots.add_task(vz * c, name="vz_times_c")
 
-scalars = solver.evaluator.add_file_handler(
-    folder_path_scalars, sim_dt=export_scalars_dt, max_writes=50, mode=file_handler_mode
-)
+# scalars = solver.evaluator.add_file_handler(
+#     folder_path_scalars, sim_dt=export_scalars_dt, max_writes=50, mode=file_handler_mode
+# )
 
 # Temporal scalars
-scalars.add_task(d3.Average(th), name="mean_th")
-scalars.add_task(d3.Average(c), name="mean_c")
-scalars.add_task(d3.Average(-dzth(z=Lz)), name="meanx_flux_th")
-scalars.add_task(d3.Average(-dzc(z=Lz)), name="meanx_flux_c")
+snapshots.add_task(d3.Average(th), name="mean_th")
+snapshots.add_task(d3.Average(c), name="mean_c")
+snapshots.add_task(d3.Average(-dzth(z=Lz)), name="meanx_flux_th")
+snapshots.add_task(d3.Average(-dzc(z=Lz)), name="meanx_flux_c")
 u2 = d3.DotProduct(u, u)
 varu = d3.Average(u2) - d3.DotProduct(d3.Average(u), d3.Average(u))
-scalars.add_task(np.sqrt(varu), name="rms_u")
+snapshots.add_task(np.sqrt(varu), name="rms_u")
+snapshots.add_task(d3.Integrate(h, "x"), name="m_ice")
 
 # mean_th.evaluate()?
 

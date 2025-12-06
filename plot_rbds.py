@@ -61,7 +61,44 @@ all_tasks = {
         "axis": "x",
         "range": [None, None],
     },
+    "mean_th": {
+        "title": "Average temperature",
+        "type": "2d",
+        "axis": "t",
+        "range": [None, None],
+    },
+    "mean_c": {
+        "title": "Average salinity",
+        "type": "2d",
+        "axis": "t",
+        "range": [None, None],
+    },
+    "meanx_flux_th": {
+        "title": "Average thermal flux at interface",
+        "type": "2d",
+        "axis": "t",
+        "range": [None, None],
+    },
+    "meanx_flux_c": {
+        "title": "Average salt flux at interface",
+        "type": "2d",
+        "axis": "t",
+        "range": [None, None],
+    },
+    "rms_u": {
+        "title": "Velocity RMS",
+        "type": "2d",
+        "axis": "t",
+        "range": [None, None],
+    },
+    "m_ice": {
+        "title": "Ice mass",
+        "type": "2d",
+        "axis": "t",
+        "range": [None, None],
+    },
 }
+
 ## !####################################################
 
 
@@ -70,7 +107,7 @@ def main(filename, start, count, output):
 
     # Plot settings
 
-    scale = 1.5
+    scale = 1
     dpi = 150
 
     def title_func(sim_time):
@@ -80,10 +117,10 @@ def main(filename, start, count, output):
         return "write_{:06}.png".format(write)
 
     # Layout
-    nrows, ncols = 4, 4  # à changer si jamais + de plots
+    nrows, ncols = 4, 6  # à changer si jamais + de plots
     image = plot_tools.Box(4, 1)  # Lx=4, Lz=1
-    pad = plot_tools.Frame(0.3, 0, 0, 0)
-    margin = plot_tools.Frame(0.2, 0.1, 0, 0)
+    pad = plot_tools.Frame(0.3, 0.3, 0, 0)
+    margin = plot_tools.Frame(1, 0.2, 0, 0.5)
 
     # Create multifigure
     mfig = plot_tools.MultiFigure(nrows, ncols + 1, image, pad, margin, scale)
@@ -97,10 +134,16 @@ def main(filename, start, count, output):
                 0,
                 0,
                 0,
-            ]  # Deux premières colonnes pour les plots 3d (colorbar) et les deux autres pour les 2d (profil spatial)
+                0,
+                0,
+            ]  # Deux premières colonnes pour les plots 3d (colorbar) et les deux autres pour les 2d (profil spatial), les 2 dernières pour les profils temporels
             row3d = 0  # passera à 1 si la 1ère colonne pleine
+            rowt = 4  # passera à 1 si l'avant dernière colonne pleine
             for n, (task, task_infos) in enumerate(all_tasks.items()):
                 # Build subfigure axes
+
+                if task == "t":
+                    continue
                 plot_type = task_infos["type"]
 
                 if plot_type == "3d":
@@ -113,6 +156,10 @@ def main(filename, start, count, output):
                         j = 2
                     elif axis == "z":
                         j = 3
+                    elif axis == "t":
+                        if filled_rows[rowt] == 3:
+                            rowt += 1
+                        j = rowt
                 filled_rows[j] += 1
                 i = filled_rows[j] - 1
 
@@ -122,7 +169,7 @@ def main(filename, start, count, output):
                 dset = file["tasks"][task]
                 task_title = task_infos["title"]
                 if task_infos["type"] == "3d":
-                    axes = mfig.add_axes(i, j, [j / 4, 0, 1, 1])
+                    axes = mfig.add_axes(i, j, [j / ncols, 0, 1, 1])
                     if "clim" not in task_infos or task_infos["clim"] == "auto":
                         plot_tools.plot_bot_3d(
                             dset,
@@ -143,12 +190,10 @@ def main(filename, start, count, output):
                             clim=task_infos["clim"],
                         )
                 elif task_infos["type"] == "2d":
-
-                    x = dset.dims[1][0][:].ravel()
-                    z = dset.dims[2][0][:].ravel()
                     values_min, values_max = task_infos["range"]
                     if task_infos["axis"] == "x":
-                        axes2d = mfig.add_axes(i, j, [j / 4, 0, 1, 1])
+                        x = dset.dims[1][0][:].ravel()
+                        axes2d = mfig.add_axes(i, j, [j / ncols, 0, 1, 1])
                         data = dset[index, :, 0]
                         axes2d.plot(x, data)
                         axes2d.set_xlabel("x")
@@ -157,7 +202,8 @@ def main(filename, start, count, output):
                         axes2d.set_ylim(values_min, values_max, auto=True)
 
                     elif task_infos["axis"] == "z":
-                        axes2d = mfig.add_axes(i, j, [j / 4, 0, 1, 1])
+                        z = dset.dims[2][0][:].ravel()
+                        axes2d = mfig.add_axes(i, j, [j / ncols, 0, 1, 1])
                         data = dset[index, 0, :]
                         axes2d.plot(data, z)
                         axes2d.set_xlabel(task_title)
@@ -166,6 +212,30 @@ def main(filename, start, count, output):
                         axes2d.set_xlim(values_min, values_max, auto=True)
 
                     # axes2d.title.set_text(task_title)
+                    elif task_infos["axis"] == "t":
+                        t_patch = dset.dims[0][0][:].ravel()
+                        axes2d = mfig.add_axes(
+                            i,
+                            j,
+                            [
+                                (4 / ncols) + (0.0 * (j - 4) / ncols),
+                                0,
+                                0.6,
+                                3 / (0.5 * nb_tseries),
+                            ],
+                        )
+                        data = task_infos["data"]
+                        t = all_tasks["t"]["data"]
+                        axes2d.plot(t, data)
+                        axes2d.scatter(
+                            [t_patch[index]], [dset[index, 0, 0]], color="black"
+                        )
+                        axes2d.set_title(task_title)
+                        if i == 2:  # last row
+                            axes2d.set_xlabel("t")
+                        else:
+                            axes2d.set_xticklabels([])
+                        axes2d.set_ylim(values_min, values_max, auto=True)
 
                 else:
                     print("WHAT??")
@@ -181,6 +251,18 @@ def main(filename, start, count, output):
             fig.savefig(str(savepath), dpi=dpi)
             fig.clear()
     plt.close(fig)
+
+
+def init_tseries(task, files):
+    from tkinter import Tcl
+
+    t = np.array([])
+    scalar = np.array([])
+    for filename in Tcl().call("lsort", "-dict", files):
+        with h5py.File(filename, mode="r") as file:
+            t = np.append(t, file["scales"]["sim_time"])
+            scalar = np.append(scalar, file["tasks"][task][:, 0, 0])
+    return t, scalar
 
 
 if __name__ == "__main__":
@@ -202,7 +284,16 @@ if __name__ == "__main__":
     globlist = glob.glob(args["<files>"])
 
     with h5py.File(globlist[0], mode="r") as file:
-        logger.info("Available data:", file["tasks"].keys())
+        logger.info(f"Available data: {list(file["tasks"].keys())}")
+
+    nb_tseries = 0
+    all_tasks["t"] = {"type": "1d"}
+    for task, task_infos in all_tasks.items():
+        if task_infos["type"] == "2d" and task_infos["axis"] == "t":
+            nb_tseries += 1
+            t, data = init_tseries(task, globlist)
+            all_tasks["t"]["data"] = t
+            all_tasks[task]["data"] = data
 
     output_path = pathlib.Path(args["--output"]).absolute()
     # Create output directory if needed
@@ -245,7 +336,7 @@ if __name__ == "__main__":
                 # folder_name = args["<files>"][0].split("/")[-2]
                 filemp4 = str(mp4_folder.joinpath(f"{run_name}.mp4"))
                 logger.info(f"Rendering {filemp4} from {pattern_png}")
-                fps = 60
+                fps = 30
                 ffmpeg.input(pattern_png, pattern_type="glob", framerate=fps).output(
                     filemp4,
                     vcodec="libx264",
@@ -256,7 +347,5 @@ if __name__ == "__main__":
                     movflags="faststart",
                 ).overwrite_output().run()
 
-    with Sync() as sync:
-        if sync.comm.rank == 0:
-            frames_pattern = f"{output_path}/*.png"
-            logger.info(f"{len(frames_pattern)} frames have been written.")
+    # frames_pattern = f"{output_path}/*.png"
+    # logger.info(f"{len(frames_pattern)} frames have been written.")

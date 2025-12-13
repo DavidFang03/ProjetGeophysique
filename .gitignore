@@ -1,5 +1,6 @@
 frames/
 snapshots/
+fft/
 videos/
 *.odp*
 scalars

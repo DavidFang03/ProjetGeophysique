@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 # ! Parameters
 ##!########################################################
-run_name = "0612"
+run_name = "1312"
 restart = False
 
 startfromprev = False
@@ -45,7 +45,7 @@ filerestart = ""
 # Résolution
 Lx, Lz = 4, 1
 Nx, Nz = 256, 64  # Augmenter ?
-max_timestep = 1e-3  # Diminuer ?
+max_timestep = 1e-4  # Diminuer ?
 dt_init = 1e-9  # Simu : pas de temps initial
 
 # Physique
@@ -58,7 +58,7 @@ Prandtl = 1  # = nu/kappa_l
 
 # Run
 stop_sim_time = 2
-export_snapshots_dt = 1e-2  # Export des *.h5 : pas de temps
+export_snapshots_dt = max_timestep * 100  # Export des *.h5 : pas de temps
 # export_scalars_dt = 1e-3  # Export des scalaires : pas de temps
 ##!########################################################
 
@@ -208,8 +208,8 @@ snapshots.add_task(tau_u1, name="tau_u1")
 snapshots.add_task(tau_u2, name="tau_u2")
 snapshots.add_task(-d3.div(d3.skew(u)), name="vorticity")
 
-snapshots.add_task(d3.Average(th, coord="x"), name="meanx_th")
-snapshots.add_task(d3.Average(c, coord="x"), name="meanx_c")
+snapshots.add_task(d3.Average(th, coord="x"), name="th_avgx")
+snapshots.add_task(d3.Average(c, coord="x"), name="c_avgx")
 snapshots.add_task(-dzth(z=Lz), name="flux_th")
 snapshots.add_task(-dzc(z=Lz), name="flux_c")
 snapshots.add_task(h, name="h")  # dépend que de x
@@ -217,15 +217,25 @@ vz = d3.DotProduct(u, ez)
 snapshots.add_task(vz * th, name="vz_times_theta")
 snapshots.add_task(vz * c, name="vz_times_c")
 
+# Stefan-Robin terms (only depend on x)
+snapshots.add_task(-Y * theta2 / h, name="sr_first")  # solid thermal flux
+# snapshots.add_task(dzth(z=Lz), name="sr_second") # liquid thermal flux already in output
+snapshots.add_task(X * dzc(z=Lz) / c(z=Lz), name="sr_third")
+snapshots.add_task(d3.Average(-Y * theta2 / h, coord="x"), name="sr_first_avgx")
+# snapshots.add_task(dzth(z=Lz), name="sr_second")
+snapshots.add_task(d3.Average(X * dzc(z=Lz) / c(z=Lz), coord="x"), name="sr_third_avgx")
+
+# "dzc(z=Lz)  = (1/X)*dzth(z=Lz)*c(z=Lz) - (Y/X)*(theta2/h)*c(z=Lz)"
+
 # scalars = solver.evaluator.add_file_handler(
 #     folder_path_scalars, sim_dt=export_scalars_dt, max_writes=50, mode=file_handler_mode
 # )
 
 # Temporal scalars
-snapshots.add_task(d3.Average(th), name="mean_th")
-snapshots.add_task(d3.Average(c), name="mean_c")
-snapshots.add_task(d3.Average(-dzth(z=Lz)), name="meanx_flux_th")
-snapshots.add_task(d3.Average(-dzc(z=Lz)), name="meanx_flux_c")
+snapshots.add_task(d3.Average(th), name="th_avg")
+snapshots.add_task(d3.Average(c), name="c_avg")
+snapshots.add_task(d3.Average(-dzth(z=Lz)), name="flux_th_avgx")
+snapshots.add_task(d3.Average(-dzc(z=Lz)), name="flux_c_avgx")
 u2 = d3.DotProduct(u, u)
 varu = d3.Average(u2) - d3.DotProduct(d3.Average(u), d3.Average(u))
 snapshots.add_task(np.sqrt(varu), name="rms_u")
@@ -251,6 +261,7 @@ flow = d3.GlobalFlowProperty(solver, cadence=10)
 flow.add_property(np.sqrt(u @ u) / nu, name="Re")
 flow.add_property(-dzth(z=Lz), name="Fth")
 flow.add_property(-dzc(z=Lz), name="Fch")
+flow.add_property(h, name="h")
 
 # Main loop
 try:
@@ -262,6 +273,7 @@ try:
             max_Re = flow.max("Re")
             max_Fth = flow.max("Fth")
             max_Fch = flow.max("Fch")
+            max_h = flow.max("h")
             logger.info(
                 "Iteration=%i, Time=%e, dt=%e, max(Re)=%f, max(Fth)=%f, max(Fch)=%f"
                 % (

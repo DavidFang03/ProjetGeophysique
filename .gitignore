@@ -4,3 +4,4 @@ fft/
 videos/
 *.odp*
 scalars
+outputs/

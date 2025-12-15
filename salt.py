@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 # ! Parameters
 ##!########################################################
-run_name = "1312"
+run_date = "1512"
 restart = False
 
 startfromprev = False
@@ -62,12 +62,10 @@ export_snapshots_dt = max_timestep * 100  # Export des *.h5 : pas de temps
 # export_scalars_dt = 1e-3  # Export des scalaires : pas de temps
 ##!########################################################
 
-run_name = f"{run_name}_Ra{Rayleigh:.0e}_Flot{Flot:.0e}_X{X}_Y{Y}_Le{Le}_Pr{Prandtl}"  # formater le reste si jamais
-folder_path = f"snapshots/{run_name}"
-# folder_path_scalars = f"scalars/{run_name}"
-folder_name = folder_path.split("/")[-1]
-restart_pattern = f"{folder_path}/{folder_name}_s*.h5"
-logger.info(f"Writing in {restart_pattern}")
+run_name = f"{run_date}_Ra{Rayleigh:.0e}_Flot{Flot:.0e}_X{X}_Y{Y}_Le{Le}_Pr{Prandtl}"  # formater le reste si jamais
+snapshots_folder = f"outputs/{run_name}/snapshots"
+checkpoints_folder = f"outputs/{run_name}/checkpoints"
+logger.info(f"Starting {run_name}")
 
 # Ne pas toucher ?
 dealias = 3 / 2
@@ -151,12 +149,13 @@ solver.stop_sim_time = stop_sim_time
 
 # Initial conditions
 if restart:
+    restart_pattern = f"{checkpoints_folder}/checkpoints_s*.h5"
     list_of_files = glob.glob(restart_pattern)
     latest_file = max(list_of_files, key=os.path.getctime)
     write, initial_timestep = solver.load_state(latest_file)
     file_handler_mode = "append"
     start_time = solver.sim_time
-    logger.info("Start time = {}".format(start_time))
+    logger.info("[Restart] Start time = {}".format(start_time))
 elif startfromprev:
     list_of_files = glob.glob(filerestart)
     # logger.info('list = {}'.format(list_of_files))
@@ -192,9 +191,32 @@ else:
 
 
 # ! Analysis
-snapshots = solver.evaluator.add_file_handler(
-    folder_path, sim_dt=export_snapshots_dt, max_writes=50, mode=file_handler_mode
+# print(file_handler_mode)
+# contenu = os.listdir(folder_path)
+# print("avant", contenu)
+# file_prefix = os.path.join(folder_path, folder_name)
+# Ensure output folder exists and use a file-prefix (folder/name) so
+# the FileHandler can find previous sets when using mode='append'.
+# os.makedirs(folder_path, exist_ok=True)
+# file_prefix = f"{folder_path}/{folder_name}"
+
+checkpoints = snapshots = solver.evaluator.add_file_handler(
+    checkpoints_folder,
+    sim_dt=export_snapshots_dt,
+    max_writes=100,
+    mode=file_handler_mode,
 )
+checkpoints.add_tasks(solver.state)
+
+snapshots = solver.evaluator.add_file_handler(
+    snapshots_folder,
+    sim_dt=export_snapshots_dt,
+    max_writes=100,
+    mode=file_handler_mode,
+)
+
+# snapshots.add_tasks(solver.state)
+print("ok")
 snapshots.add_task(th, name="th")
 snapshots.add_task(c, name="c")
 snapshots.add_task(u, name="u")
@@ -220,16 +242,12 @@ snapshots.add_task(vz * c, name="vz_times_c")
 # Stefan-Robin terms (only depend on x)
 snapshots.add_task(-Y * theta2 / h, name="sr_first")  # solid thermal flux
 # snapshots.add_task(dzth(z=Lz), name="sr_second") # liquid thermal flux already in output
-snapshots.add_task(X * dzc(z=Lz) / c(z=Lz), name="sr_third")
+snapshots.add_task(-X * dzc(z=Lz) / c(z=Lz), name="sr_third")
 snapshots.add_task(d3.Average(-Y * theta2 / h, coord="x"), name="sr_first_avgx")
 # snapshots.add_task(dzth(z=Lz), name="sr_second")
-snapshots.add_task(d3.Average(X * dzc(z=Lz) / c(z=Lz), coord="x"), name="sr_third_avgx")
-
-# "dzc(z=Lz)  = (1/X)*dzth(z=Lz)*c(z=Lz) - (Y/X)*(theta2/h)*c(z=Lz)"
-
-# scalars = solver.evaluator.add_file_handler(
-#     folder_path_scalars, sim_dt=export_scalars_dt, max_writes=50, mode=file_handler_mode
-# )
+snapshots.add_task(
+    d3.Average(-X * dzc(z=Lz) / c(z=Lz), coord="x"), name="sr_third_avgx"
+)
 
 # Temporal scalars
 snapshots.add_task(d3.Average(th), name="th_avg")
@@ -240,8 +258,6 @@ u2 = d3.DotProduct(u, u)
 varu = d3.Average(u2) - d3.DotProduct(d3.Average(u), d3.Average(u))
 snapshots.add_task(np.sqrt(varu), name="rms_u")
 snapshots.add_task(d3.Integrate(h, "x"), name="m_ice")
-
-# mean_th.evaluate()?
 
 # CFL (cadence = recalcul de dt)
 CFL = d3.CFL(

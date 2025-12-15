@@ -28,7 +28,7 @@ matplotlib.use("Agg")
 
 # mpiexec -n 8 python3 plot_rbds.py
 ## !####################################################
-run_name = "1312_Ra1e+04_Flot1e-01_X100_Y100_Le10_Pr1"
+run_name = "1512_Ra1e+04_Flot1e-01_X100_Y100_Le10_Pr1"
 make_movie = True
 clean_replot = True  # S'il y a deja des frames, repartir de zero.
 color_th = "tab:brown"
@@ -417,7 +417,7 @@ def make_movie(output_path):
             pattern_png = str(output_path.joinpath("write_*.png"))
 
             # create ./videos directory if not there
-            mp4_folder = pathlib.Path(f"./videos").absolute()
+            mp4_folder = pathlib.Path(f"outputs/{run_name}").absolute()
             if not mp4_folder.exists():
                 mp4_folder.mkdir()
             # folder_name = args["<files>"][0].split("/")[-2]
@@ -439,8 +439,8 @@ def make_movie(output_path):
 if __name__ == "__main__":
 
     logger = logging.getLogger(__name__)
-    files = f"snapshots/{run_name}/*.h5"
-    outputs = f"frames/{run_name}"
+    files = f"outputs/{run_name}/snapshots/*.h5"
+    outputs = f"outputs/{run_name}/frames"
     args = {"--output": outputs, "<files>": files}
     output_path = pathlib.Path(args["--output"]).absolute()
     globlist = glob.glob(args["<files>"])

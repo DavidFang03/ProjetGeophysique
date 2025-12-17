@@ -28,7 +28,9 @@ matplotlib.use("Agg")
 
 # mpiexec -n 8 python3 plot_rbds.py
 ## !####################################################
-run_name = "1512_Ra1e+04_Flot1e-01_X100_Y100_Le10_Pr1"
+# run_name = "1512_Ra1e+04_Flot1e-01_X100_Y100_Le10_Pr1"
+run_name = "1512_Ra1e+04_Flot1e+02_X1000_Y10_Le10_Pr1"
+tmin = 1
 make_movie = True
 clean_replot = True  # S'il y a deja des frames, repartir de zero.
 color_th = "tab:brown"
@@ -57,7 +59,7 @@ all_tasks = [
         "height": 2,
         "chaperone": [
             {"name": "flux_th", "label": "Liquid thermal flux", "color": "aqua"},
-            {"name": "sr_third", "label": "Latent heat", "color": "tab:orange"},
+            {"name": "sr_third", "label": "Latent heat term", "color": "tab:orange"},
         ],
     },
     {
@@ -183,7 +185,11 @@ all_tasks = [
                 "label": "Liquid thermal flux",
                 "color": "aqua",
             },
-            {"name": "sr_third_avgx", "label": "Latent heat", "color": "tab:orange"},
+            {
+                "name": "sr_third_avgx",
+                "label": "Latent heat term",
+                "color": "tab:orange",
+            },
         ],
     },
     {
@@ -296,7 +302,8 @@ def plot_2d(mfig, task_infos, file, index, Time):
             data = task["data"]
             ax2d.plot(Time, data, color=color, label=label)
             ax2d.set_xlabel("t")
-            ax2d.scatter([t_patch[index]], [dset[index, 0, 0]], color="black")
+            if t_patch[index] > tmin:
+                ax2d.scatter([t_patch[index]], [dset[index, 0, 0]], color="black")
             ax2d.set_ylabel(task_title)
 
         else:
@@ -328,8 +335,8 @@ def main(filename, start, count, output, Time):
     # pad = plot_tools.Frame(0.5, 0.5, 0.12, 0.12)
     # margin = plot_tools.Frame(0.12, 0.02, 0.5, 0.06)
     # Increase horizontal padding and left outer margin so plots don't crowd
+    margin = plot_tools.Frame(1, 0.1, 0.2, 0.8)
     pad = plot_tools.Frame(0.95, 0, 0.95, 0)
-    margin = plot_tools.Frame(1, 0.1, 0.2, 0.2)
 
     # Create multifigure per frame (use ncols, not ncols+1 — extra col produced blank space)
     # fig.subplots_adjust(
@@ -377,10 +384,15 @@ def init_tseries(task, files):
 
     t = np.array([])
     scalar = np.array([])
-    for filename in Tcl().call("lsort", "-dict", files):
+    # for filename in Tcl().call("lsort", "-dict", files):
+    for filename in files:
         with h5py.File(filename, mode="r") as file:
-            t = np.append(t, file["scales"]["sim_time"])
-            scalar = np.append(scalar, file["tasks"][task][:, 0, 0])
+            tfile = np.array(file["scales"]["sim_time"])
+            mask_tmin = tfile > tmin
+            tfile = tfile[mask_tmin]
+            tdata = np.array(file["tasks"][task][:, 0, 0])
+            t = np.append(t, tfile)
+            scalar = np.append(scalar, tdata[mask_tmin])
     return t, scalar
 
 
@@ -444,6 +456,8 @@ if __name__ == "__main__":
     args = {"--output": outputs, "<files>": files}
     output_path = pathlib.Path(args["--output"]).absolute()
     globlist = glob.glob(args["<files>"])
+
+    print(files)
 
     with h5py.File(globlist[0], mode="r") as file:
         logger.info(f"Available data: {list(file["tasks"].keys())}")

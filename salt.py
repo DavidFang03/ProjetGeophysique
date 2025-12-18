@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 ##!########################################################
 run_date = "1812_h0_1e-1_t2_-1"
 restart = False
+# restart_run = "outputs/1812_h0_1e-1_t2_-1_Y1e+01_Ra1e+04_Flot1e+02_X10000_Le10_Pr1"
 
 startfromprev = False
 filerestart = ""
@@ -50,9 +51,9 @@ dt_init = 1e-9  # Simu : pas de temps initial
 
 # Physique
 Rayleigh = 1e4  # Rayleigh de "température" sous-entendu
-Flot = 1  # Rapport des Rayleigh
+Flot = 1000  # Rapport des Rayleigh
 X = 10000  # (Stefan-Robin) Relie flux thermique et chimique. X grand -> Flux chimique petit.
-Y = 0.1  # (Stefan-Robin) Deuxieme Nb sans dim dans la condition aux limites de Stefan-Robin
+Y = 10  # (Stefan-Robin) Deuxieme Nb sans dim dans la condition aux limites de Stefan-Robin
 Le = 10  # = kappa_l/D. Normalement ~1000. Pour équations de diffusions.
 Prandtl = 1  # = nu/kappa_l
 

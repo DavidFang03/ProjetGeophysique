@@ -29,7 +29,7 @@ matplotlib.use("Agg")
 # mpiexec -n 8 python3 plot_rbds.py
 ## !####################################################
 # run_name = "1512_Ra1e+04_Flot1e-01_X100_Y100_Le10_Pr1"
-run_name = "1812_h0_1e-1_t2_-1_Y1e-01_Ra1e+04_Flot1e+00_X10000_Le10_Pr1"
+run_name = "1812_h0_1e-1_t2_-1_Y1e+01_Ra1e+04_Flot1e+03_X10000_Le10_Pr1"
 tmin = 0
 make_movie = True
 clean_replot = True  # S'il y a deja des frames, repartir de zero.
@@ -438,11 +438,12 @@ def make_movie(output_path):
             pattern_png = str(output_path.joinpath("write_*.png"))
 
             # create ./videos directory if not there
-            mp4_folder = pathlib.Path(f"outputs/{run_name}").absolute()
-            if not mp4_folder.exists():
-                mp4_folder.mkdir()
+            movie_folder = pathlib.Path(f"outputs/{run_name}").absolute()
+            if not movie_folder.exists():
+                movie_folder.mkdir()
             # folder_name = args["<files>"][0].split("/")[-2]
-            filemp4 = str(mp4_folder.joinpath(f"{run_name}.mp4"))
+            filemp4 = str(movie_folder.joinpath(f"{run_name}.mp4"))
+            filegif = str(movie_folder.joinpath(f"{run_name}.gif"))
             logger.info(f"Rendering {filemp4} from {pattern_png}")
             fps = 30
             ffmpeg.input(pattern_png, pattern_type="glob", framerate=fps).output(
@@ -455,6 +456,7 @@ def make_movie(output_path):
                 movflags="faststart",
             ).overwrite_output().run()
             print(filemp4)
+            ffmpeg.input(filemp4).output(filegif).overwrite_output().run()
 
 
 if __name__ == "__main__":

@@ -29,8 +29,8 @@ matplotlib.use("Agg")
 # mpiexec -n 8 python3 plot_rbds.py
 ## !####################################################
 # run_name = "1512_Ra1e+04_Flot1e-01_X100_Y100_Le10_Pr1"
-run_name = "1512_Ra1e+04_Flot1e+02_X1000_Y10_Le10_Pr1"
-tmin = 1
+run_name = "1812_h0_1e-1_t2_-1_Y1e-01_Ra1e+04_Flot1e+00_X10000_Le10_Pr1"
+tmin = 0
 make_movie = True
 clean_replot = True  # S'il y a deja des frames, repartir de zero.
 color_th = "tab:brown"
@@ -167,6 +167,14 @@ all_tasks = [
         "row": 2,
         "col": 2,
         "color": "black",
+    },
+    {
+        "name": "buoyancy",
+        "title": "Buoyancy",
+        "type": "3d",
+        "clim": "auto",
+        "row": 3,
+        "col": 2,
     },  ################################### 1st term = Fth + 3rd term
     {
         "name": "sr_first_avgx",
@@ -275,6 +283,7 @@ def plot_2d(mfig, task_infos, file, index, Time):
         color = task.get("color", "blue")
         ax2d = all_axes[n]
         name = task["name"]
+        print(n, name)
         label = task.get("label", "")
         if "title" in task:
             task_title = task["title"]
@@ -330,7 +339,7 @@ def main(filename, start, count, output, Time):
     dpi = 150
 
     # Layout
-    nrows, ncols = 5, 4  # à changer si jamais + de plots
+    nrows, ncols = 6, 4  # à changer si jamais + de plots
     image = plot_tools.Box(4, 1)  # Lx=4, Lz=1
     # pad = plot_tools.Frame(0.5, 0.5, 0.12, 0.12)
     # margin = plot_tools.Frame(0.12, 0.02, 0.5, 0.06)

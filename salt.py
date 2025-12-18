@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 # ! Parameters
 ##!########################################################
-run_date = "1712"
+run_date = "1812_h0_1e-1_t2_-1"
 restart = False
 
 startfromprev = False
@@ -50,19 +50,19 @@ dt_init = 1e-9  # Simu : pas de temps initial
 
 # Physique
 Rayleigh = 1e4  # Rayleigh de "température" sous-entendu
-Flot = 100  # Rapport des Rayleigh
-X = 1000  # (Stefan-Robin) Relie flux thermique et chimique. X grand -> Flux chimique petit.
-Y = 10  # (Stefan-Robin) Deuxieme Nb sans dim dans la condition aux limites de Stefan-Robin
+Flot = 1  # Rapport des Rayleigh
+X = 10000  # (Stefan-Robin) Relie flux thermique et chimique. X grand -> Flux chimique petit.
+Y = 0.1  # (Stefan-Robin) Deuxieme Nb sans dim dans la condition aux limites de Stefan-Robin
 Le = 10  # = kappa_l/D. Normalement ~1000. Pour équations de diffusions.
 Prandtl = 1  # = nu/kappa_l
 
 # Run
-stop_sim_time = 60
+stop_sim_time = 6
 export_snapshots_dt = stop_sim_time / 100  # Export des *.h5 : pas de temps
 # export_scalars_dt = 1e-3  # Export des scalaires : pas de temps
 ##!########################################################
 
-run_name = f"{run_date}_Ra{Rayleigh:.0e}_Flot{Flot:.0e}_X{X}_Y{Y}_Le{Le}_Pr{Prandtl}"  # formater le reste si jamais
+run_name = f"{run_date}_Y{Y:.0e}_Ra{Rayleigh:.0e}_Flot{Flot:.0e}_X{X}_Le{Le}_Pr{Prandtl}"  # formater le reste si jamais
 snapshots_folder = f"outputs/{run_name}/snapshots"
 checkpoints_folder = f"outputs/{run_name}/checkpoints"
 logger.info(f"Starting {run_name}")
@@ -110,6 +110,9 @@ dzth = d3.Differentiate(th, coords["z"])
 dzc = d3.Differentiate(c, coords["z"])
 h = dist.Field(name="h", bases=(xbasis))
 
+theta2 = -1  # = T2/T0 : doit être négatif
+theta1 = 0  # interface
+theta0 = 1  # au fond
 
 ## Equations
 problem = d3.IVP(
@@ -126,12 +129,11 @@ problem.add_equation(
     "dt(u) - Prandtl*div(grad_u) + grad(p) - Prandtl*Rayleigh*(th - Flot*c)*ez + lift(tau_u2) = - u@grad(u)"
 )
 problem.add_equation("dt(h)=(1/Le)*dzc(z=Lz)/c(z=Lz)")
+# problem.add_equation("dt(h)=(1/(Le*X))*(dzth(z=Lz)-Y*theta2/h)")
 
 ## Conditions aux limites
 # En z=Lz
-theta2 = -1  # = T2/T0 : doit être négatif
-theta1 = 0  # interface
-theta0 = 1  # au fond
+
 problem.add_equation("dzc(z=Lz)  = (1/X)*dzth(z=Lz)*c(z=Lz) - (Y/X)*(theta2/h)*c(z=Lz)")
 problem.add_equation("th(z=Lz) = 0")
 problem.add_equation("u(z=Lz) = 0")
@@ -174,7 +176,7 @@ else:
     c.fill_random("g", seed=42, distribution="normal", scale=1e-3)  # Random noise
     c["g"] *= z * (Lz - z)  # Damp noise at walls
     dzth0 = -1
-    h0 = 1 / 100
+    h0 = 1e-1
     delta = 0.1
     c0 = 1
 
@@ -229,6 +231,7 @@ snapshots.add_task(tau_c2, name="tau_c2")
 snapshots.add_task(tau_u1, name="tau_u1")
 snapshots.add_task(tau_u2, name="tau_u2")
 snapshots.add_task(-d3.div(d3.skew(u)), name="vorticity")
+snapshots.add_task(-th + Flot * c, name="buoyancy")  # buoyancy
 
 snapshots.add_task(d3.Average(th, coord="x"), name="th_avgx")
 snapshots.add_task(d3.Average(c, coord="x"), name="c_avgx")

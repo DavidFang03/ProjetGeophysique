@@ -29,7 +29,7 @@ matplotlib.use("Agg")
 # mpiexec -n 8 python3 plot_rbds.py
 ## !####################################################
 # run_name = "1512_Ra1e+04_Flot1e-01_X100_Y100_Le10_Pr1"
-run_name = "1812_h0_1e-1_t2_-1_Y1e+01_Ra1e+04_Flot1e+03_X10000_Le10_Pr1"
+run_name = "1812_h0_1e-1_t2_-1_Y1e+01_Ra1e+04_Flot1e+02_X10000_Le10_Pr1"
 tmin = 0
 make_movie = True
 clean_replot = True  # S'il y a deja des frames, repartir de zero.
@@ -283,7 +283,7 @@ def plot_2d(mfig, task_infos, file, index, Time):
         color = task.get("color", "blue")
         ax2d = all_axes[n]
         name = task["name"]
-        print(n, name)
+        # print(n, name)
         label = task.get("label", "")
         if "title" in task:
             task_title = task["title"]
@@ -402,7 +402,8 @@ def init_tseries(task, files):
             tdata = np.array(file["tasks"][task][:, 0, 0])
             t = np.append(t, tfile)
             scalar = np.append(scalar, tdata[mask_tmin])
-    return t, scalar
+    sort = np.argsort(t)
+    return t[sort], scalar[sort]
 
 
 def handle_directory(output_path):
@@ -430,7 +431,7 @@ def handle_directory(output_path):
                             os.remove(f)
 
 
-def make_movie(output_path):
+def make_movie(output_path, fps):
     import ffmpeg
 
     with Sync() as sync:
@@ -444,8 +445,8 @@ def make_movie(output_path):
             # folder_name = args["<files>"][0].split("/")[-2]
             filemp4 = str(movie_folder.joinpath(f"{run_name}.mp4"))
             filegif = str(movie_folder.joinpath(f"{run_name}.gif"))
-            logger.info(f"Rendering {filemp4} from {pattern_png}")
-            fps = 30
+            logger.info(f"Rendering {filemp4} from {pattern_png} with fps={fps}")
+            # fps = 30
             ffmpeg.input(pattern_png, pattern_type="glob", framerate=fps).output(
                 filemp4,
                 vcodec="libx264",
@@ -457,6 +458,7 @@ def make_movie(output_path):
             ).overwrite_output().run()
             print(filemp4)
             ffmpeg.input(filemp4).output(filegif).overwrite_output().run()
+            print(filegif)
 
 
 if __name__ == "__main__":
@@ -467,8 +469,6 @@ if __name__ == "__main__":
     args = {"--output": outputs, "<files>": files}
     output_path = pathlib.Path(args["--output"]).absolute()
     globlist = glob.glob(args["<files>"])
-
-    print(files)
 
     with h5py.File(globlist[0], mode="r") as file:
         logger.info(f"Available data: {list(file["tasks"].keys())}")
@@ -486,6 +486,9 @@ if __name__ == "__main__":
                 task_infos["secondary_yaxis"]["data"] = init_tseries(
                     task_infos["secondary_yaxis"]["name"], globlist
                 )[1]
+    tmax = np.max(Time)
+    nb_outputs = len(Time)
+    fps = nb_outputs / (1.5 * tmax)
 
     # Create output directory if needed
     handle_directory(output_path)
@@ -494,7 +497,7 @@ if __name__ == "__main__":
     post.visit_writes(globlist, main, output=output_path, Time=Time)
 
     if make_movie:
-        make_movie(output_path)
+        make_movie(output_path, fps)
 
     # frames_pattern = f"{output_path}/*.png"
     # logger.info(f"{len(frames_pattern)} frames have been written.")

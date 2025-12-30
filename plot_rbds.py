@@ -26,15 +26,22 @@ import glob
 
 matplotlib.use("Agg")
 
+boundaries = {"c": [], "th": [], "buoyancy": []}
+
 # mpiexec -n 8 python3 plot_rbds.py
 ## !####################################################
 # run_name = "1512_Ra1e+04_Flot1e-01_X100_Y100_Le10_Pr1"
-run_name = "1812_h0_1e-1_t2_-1_Y1e+01_Ra1e+04_Flot1e+02_X10000_Le10_Pr1"
+run_path = "/v2/2912_h0_1e-1_t2_-1_Y1e+00_Ra1e+04_Flot1e+02_X1e-01_Le10_Pr1"
+run_name = run_path.split("/")[-1]
 tmin = 0
 make_movie = True
-clean_replot = True  # S'il y a deja des frames, repartir de zero.
+clean_replot = True  # S'il y ah deja des frames, repartir de zero.
 color_th = "tab:brown"
 color_c = "tab:gray"
+
+c_clim = [0.5, 1.2]
+th_clim = [0, 1]
+buoyancy_clim = [66, 130]
 all_tasks = [
     {
         "name": "h",
@@ -66,7 +73,7 @@ all_tasks = [
         "name": "th",
         "title": "Temperature",
         "type": "3d",
-        "clim": [0, 1],
+        "clim": th_clim,
         "row": 3,
         "col": 0,
         "color": color_th,
@@ -75,7 +82,7 @@ all_tasks = [
         "name": "c",
         "title": "Salinity",
         "type": "3d",
-        "clim": "auto",
+        "clim": c_clim,
         "row": 4,
         "col": 0,
     },
@@ -112,6 +119,7 @@ all_tasks = [
         "row": 2,
         "col": 1,
         "color": color_th,
+        "alpha": 0.1,
         "secondary_xaxis": {
             "name": "c_avgx",
             "title": "Salinity horizontal average",
@@ -172,7 +180,7 @@ all_tasks = [
         "name": "buoyancy",
         "title": "Buoyancy",
         "type": "3d",
-        "clim": "auto",
+        "clim": buoyancy_clim,
         "row": 3,
         "col": 2,
     },  ################################### 1st term = Fth + 3rd term
@@ -215,6 +223,21 @@ all_tasks = [
             "color": color_c,
         },
     },
+    {
+        "name": "c_avgx_interface",
+        "title": "Average salinity at interface",
+        "type": "2d",
+        "axis": "t",
+        "range": [None, None],
+        "row": 4,
+        "col": 3,
+        "color": color_c,
+        # "secondary_yaxis": {
+        #     "name": "flux_c_avgx",
+        #     "title": "Average salt flux at interface",
+        #     "color": color_c,
+        # },
+    },
 ]
 
 ## !####################################################
@@ -247,6 +270,12 @@ def plot_3d(mfig, task_infos, dset, index):
             visible_axes=False,
             clim=task_infos["clim"],
         )
+    name = task_infos["name"]
+    # print(name, name in boundaries)
+    if name in boundaries:
+        # print(data)
+        boundaries[name].append(np.min(dset))
+        boundaries[name].append(np.max(dset))
 
 
 def plot_2d(mfig, task_infos, file, index, Time):
@@ -266,12 +295,14 @@ def plot_2d(mfig, task_infos, file, index, Time):
     all_axes = [ax]
     if task_infos.get("secondary_yaxis"):
         ax2d = ax.twinx()
-        ax2d.tick_params(axis="y", labelcolor=color)
+        ax2d.tick_params(axis="y", labelcolor=task_infos["secondary_yaxis"]["color"])
+        ax.tick_params(axis="y", labelcolor=task_infos["color"])
         all_tasks.append(task_infos["secondary_yaxis"])
         all_axes.append(ax2d)
     elif task_infos.get("secondary_xaxis"):
         ax2d = ax.twiny()
-        ax2d.tick_params(axis="x", labelcolor=color)
+        ax2d.tick_params(axis="x", labelcolor=task_infos["secondary_xaxis"]["color"])
+        ax.tick_params(axis="x", labelcolor=task_infos["color"])
         all_tasks.append(task_infos["secondary_xaxis"])
         all_axes.append(ax2d)
     elif "chaperone" in task_infos:
@@ -281,6 +312,7 @@ def plot_2d(mfig, task_infos, file, index, Time):
 
     for n, task in enumerate(all_tasks):
         color = task.get("color", "blue")
+        alpha = task.get("alpha", 0.8)
         ax2d = all_axes[n]
         name = task["name"]
         # print(n, name)
@@ -294,15 +326,20 @@ def plot_2d(mfig, task_infos, file, index, Time):
             data = dset[index, :, 0]
             ax2d.plot(x, data, color=color, label=label)
             ax2d.set_xlabel(r"$x$")
-            ax2d.set_ylabel(task_title)
+            if "chaperone" in task_infos:
+                ax2d.set_ylabel(task_title, color="black")
+            else:
+                ax2d.set_ylabel(task_title, color=color)
             # ax2d.set_xticks([])
 
         elif plot_axis == "z":
             z = dset.dims[2][0][:].ravel()
             data = dset[index, 0, :]
-            ax2d.plot(data, z, color=color, label=label)
-            ax2d.set_xlabel(task_title)
+            ax2d.plot(data, z, color=color, label=label, alpha=alpha)
+            ax2d.set_xlabel(task_title, color=color)
             ax2d.set_ylabel(r"$z$")
+            if "range" in task:
+                ax2d.set_xlim(*task["range"])
             # ax2d.set_yticks([])
 
         # ax2d.title.set_text(task_title)
@@ -310,10 +347,10 @@ def plot_2d(mfig, task_infos, file, index, Time):
             t_patch = dset.dims[0][0][:].ravel()
             data = task["data"]
             ax2d.plot(Time, data, color=color, label=label)
-            ax2d.set_xlabel("t")
+            ax2d.set_xlabel(r"$t$")
             if t_patch[index] > tmin:
                 ax2d.scatter([t_patch[index]], [dset[index, 0, 0]], color="black")
-            ax2d.set_ylabel(task_title)
+            ax2d.set_ylabel(task_title, color=color)
 
         else:
             raise NotImplementedError(plot_axis)
@@ -330,7 +367,7 @@ def savename_func(write):
     return "write_{:06}.png".format(write)
 
 
-def main(filename, start, count, output, Time):
+def main(filename, start, count, output, Time, all_tasks):
     """Save plot of specified tasks for given range of analysis writes."""
 
     # Plot settings
@@ -341,16 +378,9 @@ def main(filename, start, count, output, Time):
     # Layout
     nrows, ncols = 6, 4  # à changer si jamais + de plots
     image = plot_tools.Box(4, 1)  # Lx=4, Lz=1
-    # pad = plot_tools.Frame(0.5, 0.5, 0.12, 0.12)
-    # margin = plot_tools.Frame(0.12, 0.02, 0.5, 0.06)
     # Increase horizontal padding and left outer margin so plots don't crowd
     margin = plot_tools.Frame(1, 0.1, 0.2, 0.8)
     pad = plot_tools.Frame(0.95, 0, 0.95, 0)
-
-    # Create multifigure per frame (use ncols, not ncols+1 — extra col produced blank space)
-    # fig.subplots_adjust(
-    #     left=0.13, right=0.99, top=0.92, bottom=0.06, wspace=0.45, hspace=0.35
-    # )
 
     # Plot writes
     with h5py.File(filename, mode="r") as file:
@@ -389,7 +419,6 @@ def main(filename, start, count, output, Time):
 
 
 def init_tseries(task, files):
-    from tkinter import Tcl
 
     t = np.array([])
     scalar = np.array([])
@@ -438,8 +467,7 @@ def make_movie(output_path, fps):
         if sync.comm.rank == 0:
             pattern_png = str(output_path.joinpath("write_*.png"))
 
-            # create ./videos directory if not there
-            movie_folder = pathlib.Path(f"outputs/{run_name}").absolute()
+            movie_folder = pathlib.Path(f"outputs/{run_path}").absolute()
             if not movie_folder.exists():
                 movie_folder.mkdir()
             # folder_name = args["<files>"][0].split("/")[-2]
@@ -464,8 +492,8 @@ def make_movie(output_path, fps):
 if __name__ == "__main__":
 
     logger = logging.getLogger(__name__)
-    files = f"outputs/{run_name}/snapshots/*.h5"
-    outputs = f"outputs/{run_name}/frames"
+    files = f"outputs/{run_path}/snapshots/*.h5"
+    outputs = f"outputs/{run_path}/frames"
     args = {"--output": outputs, "<files>": files}
     output_path = pathlib.Path(args["--output"]).absolute()
     globlist = glob.glob(args["<files>"])
@@ -486,18 +514,48 @@ if __name__ == "__main__":
                 task_infos["secondary_yaxis"]["data"] = init_tseries(
                     task_infos["secondary_yaxis"]["name"], globlist
                 )[1]
+
+    # # ! Dirty trick to get the range of c(z) profile
+    # _, c_avgx = init_tseries("c_avgx_interface", globlist)
+    # c_avgx_min, c_avgx_max = np.min(c_avgx), np.max(c_avgx)
+    # with h5py.File(globlist[0], mode="r") as file:
+    #     dset = file["tasks"]["c_avgx"]
+    #     data = dset[0, 0, :]
+    #     c_avgx_min = np.min([c_avgx_min, np.min(data)])
+    #     c_avgx_max = np.max([c_avgx_max, np.max(data)])
+
+    # # print(c_avgx_min)
+    # for task in all_tasks:
+    #     if task["name"] == "th_avgx":
+    #         task["secondary_xaxis"]["range"] = [
+    #             c_avgx_min - 0.05 * np.abs(c_avgx_max - c_avgx_min),
+    #             c_avgx_max + 0.05 * np.abs(c_avgx_max - c_avgx_min),
+    #         ]
+
     tmax = np.max(Time)
     nb_outputs = len(Time)
-    fps = nb_outputs / (1.5 * tmax)
+    fps = nb_outputs / (3 * tmax)
 
     # Create output directory if needed
     handle_directory(output_path)
 
     logger.info(f"Entering {output_path}")
-    post.visit_writes(globlist, main, output=output_path, Time=Time)
+    post.visit_writes(
+        globlist, main, output=output_path, Time=Time, all_tasks=all_tasks
+    )
 
     if make_movie:
         make_movie(output_path, fps)
+
+    with Sync() as sync:
+        if sync.comm.rank == 0:
+            showboundaries = {}
+            for name in boundaries:
+                print(boundaries[name])
+                low = np.min(boundaries[name])
+                top = np.max(boundaries[name])
+                showboundaries[name] = f"[{low:.1e} {top:.1e}]"
+            logger.info(f"I would recommand new clims: {showboundaries}")
 
     # frames_pattern = f"{output_path}/*.png"
     # logger.info(f"{len(frames_pattern)} frames have been written.")

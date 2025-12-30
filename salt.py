@@ -35,7 +35,8 @@ logger = logging.getLogger(__name__)
 
 # ! Parameters
 ##!########################################################
-run_date = "1812_h0_1e-1_t2_-1"
+run_date = "/v2/2912_h0_1e-1_t2_-1"
+# restart = True
 restart = False
 # restart_run = "outputs/1812_h0_1e-1_t2_-1_Y1e+01_Ra1e+04_Flot1e+02_X10000_Le10_Pr1"
 
@@ -46,24 +47,25 @@ filerestart = ""
 # Résolution
 Lx, Lz = 4, 1
 Nx, Nz = 256, 64  # Augmenter ?
-max_timestep = 1e-4  # Diminuer ?
+# Nx, Nz = 512, 128  # Augmenter ?
+max_timestep = 5e-4  # Diminuer ?
 dt_init = 1e-9  # Simu : pas de temps initial
 
 # Physique
 Rayleigh = 1e4  # Rayleigh de "température" sous-entendu
-Flot = 1000  # Rapport des Rayleigh
-X = 10000  # (Stefan-Robin) Relie flux thermique et chimique. X grand -> Flux chimique petit.
-Y = 10  # (Stefan-Robin) Deuxieme Nb sans dim dans la condition aux limites de Stefan-Robin
+Flot = 1e1  # Rapport des Rayleigh solutal/thermique
+X = 1e-1  # (Stefan-Robin) Relie flux thermique et chimique. X grand -> Flux chimique petit.
+Y = 1  # (Stefan-Robin) Deuxieme Nb sans dim dans la condition aux limites de Stefan-Robin
 Le = 10  # = kappa_l/D. Normalement ~1000. Pour équations de diffusions.
 Prandtl = 1  # = nu/kappa_l
 
 # Run
-stop_sim_time = 6
-export_snapshots_dt = stop_sim_time / 100  # Export des *.h5 : pas de temps
+stop_sim_time = 2
+export_snapshots_dt = stop_sim_time / 120  # Export des *.h5 : pas de temps
 # export_scalars_dt = 1e-3  # Export des scalaires : pas de temps
 ##!########################################################
 
-run_name = f"{run_date}_Y{Y:.0e}_Ra{Rayleigh:.0e}_Flot{Flot:.0e}_X{X}_Le{Le}_Pr{Prandtl}"  # formater le reste si jamais
+run_name = f"{run_date}_Y{Y:.0e}_Ra{Rayleigh:.0e}_Flot{Flot:.0e}_X{X:.0e}_Le{Le}_Pr{Prandtl}"  # formater le reste si jamais
 snapshots_folder = f"outputs/{run_name}/snapshots"
 checkpoints_folder = f"outputs/{run_name}/checkpoints"
 logger.info(f"Starting {run_name}")
@@ -111,9 +113,12 @@ dzth = d3.Differentiate(th, coords["z"])
 dzc = d3.Differentiate(c, coords["z"])
 h = dist.Field(name="h", bases=(xbasis))
 
-theta2 = -1  # = T2/T0 : doit être négatif
+theta2 = -0.05  # = T2/T0 : doit être négatif
 theta1 = 0  # interface
 theta0 = 1  # au fond
+h0 = 1e-1
+delta = 0.1
+c0 = 1
 
 ## Equations
 problem = d3.IVP(
@@ -176,18 +181,15 @@ else:
 
     c.fill_random("g", seed=42, distribution="normal", scale=1e-3)  # Random noise
     c["g"] *= z * (Lz - z)  # Damp noise at walls
-    dzth0 = -1
-    h0 = 1e-1
-    delta = 0.1
-    c0 = 1
-
-    St = -Y * theta2 / h0 + theta1 - theta0
-    c1 = c0 / (1 - (1 - delta) * St)
-    cuniform = c0
-    clin = c1 * St * (z - (1 - delta)) + c0
-    c["g"] += np.where(z > Lz - delta, clin, cuniform)
+    # dzth0 = -1
 
     h["g"] = h0
+
+    St = (-Y * (theta2 - theta1) / h0 + (theta1 - theta0) / Lz) / X
+    c1 = c0 / (1 - delta * St)
+    clin = c1 * St * (z - (1 - delta)) + c0
+    logger.info(f"are these concentrations positive ? c1={c1:.2e} c0={c0:.2e}")
+    c["g"] += np.where(z > Lz - delta, clin, c0)
 
     file_handler_mode = "overwrite"
     initial_timestep = dt_init
@@ -219,7 +221,6 @@ snapshots = solver.evaluator.add_file_handler(
 )
 
 # snapshots.add_tasks(solver.state)
-print("ok")
 snapshots.add_task(th, name="th")
 snapshots.add_task(c, name="c")
 snapshots.add_task(u, name="u")
@@ -262,6 +263,8 @@ u2 = d3.DotProduct(u, u)
 varu = d3.Average(u2) - d3.DotProduct(d3.Average(u), d3.Average(u))
 snapshots.add_task(np.sqrt(varu), name="rms_u")
 snapshots.add_task(d3.Integrate(h, "x"), name="m_ice")
+
+snapshots.add_task(d3.Average(c(z=Lz), "x"), name="c_avgx_interface")
 
 # CFL (cadence = recalcul de dt)
 CFL = d3.CFL(
